@@ -1,13 +1,15 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
-import { PlusCircle, MoreHorizontal, Clock, AlertCircle } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, Clock, AlertCircle, FileCode, Link2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import IssueForm from './IssueForm';
 import { useToast } from '@/hooks/use-toast';
+import { useNavigate } from 'react-router-dom';
 
 // Sample data - In a real app, this would come from a backend
 const initialColumns = {
@@ -47,6 +49,7 @@ const initialIssues = {
     assignee: 'Alex Chen',
     dueDate: '2023-10-25',
     type: 'task',
+    codeReviewId: null,
   },
   'issue-2': {
     id: 'issue-2',
@@ -56,6 +59,7 @@ const initialIssues = {
     assignee: 'Maya Johnson',
     dueDate: '2023-10-20',
     type: 'bug',
+    codeReviewId: 'issue1',
   },
   'issue-3': {
     id: 'issue-3',
@@ -65,6 +69,7 @@ const initialIssues = {
     assignee: 'Unassigned',
     dueDate: null,
     type: 'maintenance',
+    codeReviewId: null,
   },
   'issue-4': {
     id: 'issue-4',
@@ -74,6 +79,7 @@ const initialIssues = {
     assignee: 'Taylor Smith',
     dueDate: '2023-10-22',
     type: 'feature',
+    codeReviewId: null,
   },
   'issue-5': {
     id: 'issue-5',
@@ -83,6 +89,7 @@ const initialIssues = {
     assignee: 'Jamie Park',
     dueDate: '2023-10-28',
     type: 'task',
+    codeReviewId: null,
   },
   'issue-6': {
     id: 'issue-6',
@@ -92,6 +99,7 @@ const initialIssues = {
     assignee: 'Alex Chen',
     dueDate: '2023-10-18',
     type: 'feature',
+    codeReviewId: null,
   },
   'issue-7': {
     id: 'issue-7',
@@ -101,6 +109,7 @@ const initialIssues = {
     assignee: 'Maya Johnson',
     dueDate: '2023-10-23',
     type: 'improvement',
+    codeReviewId: null,
   },
   'issue-8': {
     id: 'issue-8',
@@ -110,6 +119,7 @@ const initialIssues = {
     assignee: 'Taylor Smith',
     dueDate: '2023-10-15',
     type: 'bug',
+    codeReviewId: 'issue4',
   },
   'issue-9': {
     id: 'issue-9',
@@ -119,6 +129,7 @@ const initialIssues = {
     assignee: 'Jamie Park',
     dueDate: '2023-10-10',
     type: 'documentation',
+    codeReviewId: null,
   },
   'issue-10': {
     id: 'issue-10',
@@ -128,7 +139,34 @@ const initialIssues = {
     assignee: 'Legal Team',
     dueDate: '2023-10-08',
     type: 'task',
+    codeReviewId: null,
   },
+};
+
+// Check for existing tickets from code review
+const checkForCodeReviewTickets = () => {
+  try {
+    const storedIssues = localStorage.getItem('reviewIssues');
+    if (storedIssues) {
+      const parsedIssues = JSON.parse(storedIssues);
+      const ticketIssues = parsedIssues.filter((issue: any) => issue.ticketId);
+      
+      return ticketIssues.map((issue: any) => ({
+        id: `cr-${issue.id}`,
+        title: `Fix: ${issue.message}`,
+        description: issue.suggestion || issue.message,
+        priority: issue.type === 'error' ? 'high' : issue.type === 'warning' ? 'medium' : 'low',
+        assignee: 'Unassigned',
+        dueDate: null,
+        type: issue.type === 'error' ? 'bug' : 'task',
+        codeReviewId: issue.id,
+      }));
+    }
+    return [];
+  } catch (e) {
+    console.error('Error checking for code review tickets:', e);
+    return [];
+  }
 };
 
 const IssueBoard = () => {
@@ -136,6 +174,32 @@ const IssueBoard = () => {
   const [issues, setIssues] = useState(initialIssues);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const { toast } = useToast();
+  const navigate = useNavigate();
+  
+  // Check for tickets from code review on mount
+  useEffect(() => {
+    const codeReviewTickets = checkForCodeReviewTickets();
+    if (codeReviewTickets.length > 0) {
+      const newIssues = { ...issues };
+      const newColumns = { ...columns };
+      
+      codeReviewTickets.forEach(ticket => {
+        // Only add if we don't already have this ticket
+        if (!Object.values(issues).some(issue => issue.codeReviewId === ticket.codeReviewId)) {
+          newIssues[ticket.id] = ticket;
+          newColumns.todo.issueIds = [ticket.id, ...newColumns.todo.issueIds];
+        }
+      });
+      
+      setIssues(newIssues);
+      setColumns(newColumns);
+      
+      toast({
+        title: "Code review tickets imported",
+        description: `${codeReviewTickets.length} tickets were imported from your code review`,
+      });
+    }
+  }, []);
   
   const handleDragEnd = (result: any) => {
     const { destination, source, draggableId } = result;
@@ -205,6 +269,7 @@ const IssueBoard = () => {
       [issueId]: {
         id: issueId,
         ...newIssue,
+        codeReviewId: null,
       },
     });
     
@@ -222,6 +287,16 @@ const IssueBoard = () => {
       title: "Issue created",
       description: "New issue has been added to the backlog",
     });
+  };
+  
+  const handleViewCodeReview = (codeReviewId: string) => {
+    navigate('/review');
+    
+    setTimeout(() => {
+      // This would be handled better in a real app with proper state management
+      const event = new CustomEvent('selectIssue', { detail: { issueId: codeReviewId } });
+      window.dispatchEvent(event);
+    }, 100);
   };
   
   const getPriorityColor = (priority: string) => {
@@ -277,6 +352,7 @@ const IssueBoard = () => {
                   >
                     {column.issueIds.map((issueId, index) => {
                       const issue = issues[issueId as keyof typeof issues];
+                      if (!issue) return null;
                       return (
                         <Draggable key={issue.id} draggableId={issue.id} index={index}>
                           {(provided) => (
@@ -291,6 +367,25 @@ const IssueBoard = () => {
                                   <div className="flex items-center gap-1">
                                     {getTypeIcon(issue.type)}
                                     <Badge variant="outline" className="capitalize">{issue.type}</Badge>
+                                    {issue.codeReviewId && (
+                                      <TooltipProvider>
+                                        <Tooltip>
+                                          <TooltipTrigger asChild>
+                                            <Button 
+                                              variant="ghost" 
+                                              size="icon" 
+                                              className="h-6 w-6 ml-1"
+                                              onClick={() => handleViewCodeReview(issue.codeReviewId!)}
+                                            >
+                                              <FileCode size={12} className="text-blue-500" />
+                                            </Button>
+                                          </TooltipTrigger>
+                                          <TooltipContent>
+                                            <p>View in Code Review</p>
+                                          </TooltipContent>
+                                        </Tooltip>
+                                      </TooltipProvider>
+                                    )}
                                   </div>
                                   <Button variant="ghost" size="icon" className="h-7 w-7">
                                     <MoreHorizontal size={14} />

@@ -1,264 +1,245 @@
 
 import React, { useState } from 'react';
-import { Bot, X, ArrowRight, Calendar, RefreshCcw, Brain } from 'lucide-react';
+import { 
+  Bot, X, Calendar, TicketCheck, Lightbulb, 
+  MessageSquare, ChevronDown, ChevronUp 
+} from 'lucide-react';
+import { 
+  Dialog, DialogContent, DialogHeader, 
+  DialogTitle, DialogTrigger, DialogClose 
+} from '@/components/ui/dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Button } from '@/components/ui/button';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Label } from '@/components/ui/label';
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useToast } from '@/hooks/use-toast';
 
-const projectStrategies = [
-  {
-    name: 'Agile/Scrum',
-    description: 'Iterative approach with sprints and daily standups',
-  },
-  {
-    name: 'Kanban',
-    description: 'Visualize workflow, limit work in progress',
-  },
-  {
-    name: 'Lean',
-    description: 'Minimize waste, maximize value',
-  },
-];
+type AssistantMode = 'ticket' | 'schedule' | 'strategy' | 'general';
 
-interface AIAssistantProps {}
+interface AIResponse {
+  id: string;
+  text: string;
+  timestamp: Date;
+}
 
-const AIAssistant: React.FC<AIAssistantProps> = () => {
+const AIAssistant = () => {
   const [isOpen, setIsOpen] = useState(false);
-  const [inputValue, setInputValue] = useState('');
-  const [activeTab, setActiveTab] = useState('chat');
-  const [selectedStrategy, setSelectedStrategy] = useState('Agile/Scrum');
-  const [isThinking, setIsThinking] = useState(false);
-  const [messages, setMessages] = useState<Array<{role: string, content: string}>>([
-    {
-      role: 'assistant',
-      content: 'Hi there! I\'m your AI project assistant. I can help with tasks like scheduling meetings, creating tickets, or suggesting management strategies. How can I help you today?'
-    }
-  ]);
+  const [prompt, setPrompt] = useState('');
+  const [isTyping, setIsTyping] = useState(false);
+  const [responses, setResponses] = useState<AIResponse[]>([]);
+  const [mode, setMode] = useState<AssistantMode>('general');
   const { toast } = useToast();
-
-  const handleSend = () => {
-    if (!inputValue.trim()) return;
-    
-    // Add user message
-    setMessages(prev => [...prev, { role: 'user', content: inputValue }]);
-    setIsThinking(true);
+  
+  const assistantModes = {
+    general: {
+      title: 'AI Assistant',
+      placeholder: 'Ask me anything about your project...',
+      icon: <Bot size={18} />
+    },
+    ticket: {
+      title: 'Ticket Generator',
+      placeholder: 'Describe the task or issue you want to create...',
+      icon: <TicketCheck size={18} />
+    },
+    schedule: {
+      title: 'Meeting Scheduler',
+      placeholder: 'Describe the meeting you want to schedule...',
+      icon: <Calendar size={18} />
+    },
+    strategy: {
+      title: 'Strategy Advisor',
+      placeholder: 'What kind of project management strategy do you need help with?',
+      icon: <Lightbulb size={18} />
+    }
+  };
+  
+  const generateResponse = (userPrompt: string) => {
+    setIsTyping(true);
     
     // Simulate AI thinking
     setTimeout(() => {
-      // Add AI response after thinking
       let response = '';
       
-      if (inputValue.toLowerCase().includes('meeting') || inputValue.toLowerCase().includes('schedule')) {
-        response = "I can help schedule that meeting. Would you like me to find a time slot next week that works for everyone and send out calendar invites?";
-      } else if (inputValue.toLowerCase().includes('ticket') || inputValue.toLowerCase().includes('issue')) {
-        response = "I can create a ticket for that. Let me gather some information first. What priority would you assign to this issue, and who should be responsible for it?";
-      } else if (inputValue.toLowerCase().includes('sprint') || inputValue.toLowerCase().includes('planning')) {
-        response = "For sprint planning, I recommend reviewing the backlog first to identify high-priority items. Based on your team's velocity of 45 points, you should be able to commit to approximately 40-50 points for the next sprint.";
-      } else {
-        response = "I understand. How would you like me to help with that? I can assist with scheduling, creating tickets, or providing project management advice.";
+      switch (mode) {
+        case 'ticket':
+          response = `Creating ticket: "${userPrompt.substring(0, 30)}..."\n\nAssigned to: Team Lead\nPriority: Medium\nDue Date: ${new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toLocaleDateString()}\n\nWould you like to edit any of these details?`;
+          break;
+        case 'schedule':
+          response = `I've scheduled a meeting for "${userPrompt.substring(0, 30)}..."\n\nDate: ${new Date(Date.now() + 24 * 60 * 60 * 1000).toLocaleDateString()}\nTime: 10:00 AM\nAttendees: Team\nLocation: Main Conference Room\n\nI've sent calendar invites to all team members.`;
+          break;
+        case 'strategy':
+          response = `Based on your requirements, I recommend using an Agile Scrum methodology:\n\n• 2-week sprints\n• Daily standups at 9:30 AM\n• Sprint planning on Mondays\n• Retrospectives on Fridays\n\nThis will help maintain flexibility while ensuring regular delivery of working features.`;
+          break;
+        default:
+          response = `I analyzed your request: "${userPrompt.substring(0, 30)}..."\n\nThis seems like a ${Math.random() > 0.5 ? 'medium' : 'high'} priority task. Would you like me to create a ticket for this, schedule a meeting to discuss it, or suggest a project management strategy?`;
       }
       
-      setMessages(prev => [...prev, { role: 'assistant', content: response }]);
-      setIsThinking(false);
-      setInputValue('');
+      setResponses(prev => [...prev, {
+        id: Date.now().toString(),
+        text: response,
+        timestamp: new Date()
+      }]);
+      
+      setIsTyping(false);
+      setPrompt('');
+      
+      toast({
+        title: "AI Assistant",
+        description: "Response generated successfully",
+      });
     }, 1500);
   };
   
-  const handleScheduleMeeting = () => {
-    toast({
-      title: "Meeting Scheduled",
-      description: "Daily standup meeting scheduled for tomorrow at 10:00 AM",
-    });
-    setIsOpen(false);
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!prompt.trim()) return;
+    
+    setResponses(prev => [...prev, {
+      id: `user-${Date.now()}`,
+      text: prompt,
+      timestamp: new Date()
+    }]);
+    
+    generateResponse(prompt);
   };
   
-  const handleCreateTicket = () => {
+  const handleModeChange = (newMode: AssistantMode) => {
+    setMode(newMode);
+    setResponses([]);
     toast({
-      title: "Ticket Created",
-      description: "New bug ticket has been created and assigned to the team",
+      title: "Mode changed",
+      description: `Switched to ${assistantModes[newMode].title} mode`,
     });
-    setIsOpen(false);
   };
-
+  
   return (
-    <Popover open={isOpen} onOpenChange={setIsOpen}>
-      <PopoverTrigger asChild>
-        <Button variant="outline" className="gap-2">
-          <Bot size={18} />
-          <span>AI Assistant</span>
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-[360px] p-0" align="end">
-        <div className="bg-primary/5 p-3 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Bot size={18} className="text-primary" />
-            <span className="font-medium">Project Assistant</span>
-          </div>
-          <ToggleGroup type="single" value={activeTab} onValueChange={(v) => v && setActiveTab(v)}>
-            <ToggleGroupItem value="chat" size="sm">Chat</ToggleGroupItem>
-            <ToggleGroupItem value="actions" size="sm">Actions</ToggleGroupItem>
-            <ToggleGroupItem value="pm" size="sm">PM</ToggleGroupItem>
-          </ToggleGroup>
-        </div>
-        
-        {activeTab === 'chat' && (
-          <>
-            <div className="h-[260px] overflow-y-auto p-3 space-y-4">
-              {messages.map((message, i) => (
-                <div key={i} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+    <>
+      <Dialog open={isOpen} onOpenChange={setIsOpen}>
+        <DialogTrigger asChild>
+          <Button variant="outline" className="gap-2">
+            <Bot size={16} />
+            <span className="hidden sm:inline">AI Assistant</span>
+          </Button>
+        </DialogTrigger>
+        <DialogContent className="sm:max-w-[500px] h-[600px] flex flex-col">
+          <DialogHeader className="flex flex-row items-center justify-between border-b pb-2">
+            <div className="flex items-center gap-2">
+              {assistantModes[mode].icon}
+              <DialogTitle>{assistantModes[mode].title}</DialogTitle>
+            </div>
+            
+            <div className="flex items-center gap-2">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-8 w-8">
+                    <ChevronDown size={16} />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => handleModeChange('general')}>
+                    <Bot size={16} className="mr-2" />
+                    General Assistant
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleModeChange('ticket')}>
+                    <TicketCheck size={16} className="mr-2" />
+                    Ticket Generator
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleModeChange('schedule')}>
+                    <Calendar size={16} className="mr-2" />
+                    Meeting Scheduler
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleModeChange('strategy')}>
+                    <Lightbulb size={16} className="mr-2" />
+                    Strategy Advisor
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              
+              <DialogClose asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8">
+                  <X size={16} />
+                </Button>
+              </DialogClose>
+            </div>
+          </DialogHeader>
+          
+          <div className="flex-1 overflow-y-auto py-4 space-y-4">
+            {responses.length === 0 ? (
+              <div className="h-full flex flex-col items-center justify-center text-center p-4">
+                <Bot size={40} className="text-gray-400 mb-2" />
+                <h3 className="text-lg font-medium">How can I help?</h3>
+                <p className="text-sm text-gray-500 mt-1 max-w-xs">
+                  I can create tickets, schedule meetings, or recommend project management strategies.
+                </p>
+              </div>
+            ) : (
+              responses.map(response => (
+                <div 
+                  key={response.id} 
+                  className={`flex ${response.id.startsWith('user') ? 'justify-end' : 'justify-start'}`}
+                >
                   <div 
-                    className={`max-w-[80%] p-2 rounded-lg ${
-                      message.role === 'user' 
-                        ? 'bg-primary text-primary-foreground'
+                    className={`rounded-lg px-4 py-2 max-w-[80%] ${
+                      response.id.startsWith('user') 
+                        ? 'bg-primary text-primary-foreground' 
                         : 'bg-muted'
                     }`}
                   >
-                    {message.content}
-                  </div>
-                </div>
-              ))}
-              {isThinking && (
-                <div className="flex justify-start">
-                  <div className="max-w-[80%] p-3 rounded-lg bg-muted">
-                    <div className="flex space-x-2 items-center">
-                      <div className="w-2 h-2 bg-primary rounded-full animate-pulse" />
-                      <div className="w-2 h-2 bg-primary rounded-full animate-pulse delay-150" />
-                      <div className="w-2 h-2 bg-primary rounded-full animate-pulse delay-300" />
+                    <div className="whitespace-pre-line">{response.text}</div>
+                    <div className="text-xs opacity-70 mt-1 text-right">
+                      {response.timestamp.toLocaleTimeString()}
                     </div>
                   </div>
                 </div>
-              )}
-            </div>
-            
-            <div className="p-3 border-t">
-              <div className="flex gap-2">
-                <Textarea 
-                  placeholder="Type your message..." 
-                  className="min-h-[60px] resize-none"
-                  value={inputValue}
-                  onChange={(e) => setInputValue(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                      e.preventDefault();
-                      handleSend();
-                    }
-                  }}
-                />
-                <Button className="self-end" onClick={handleSend}>
-                  <ArrowRight size={18} />
-                </Button>
-              </div>
-            </div>
-          </>
-        )}
-        
-        {activeTab === 'actions' && (
-          <div className="p-3 space-y-4">
-            <p className="text-sm text-muted-foreground">What would you like me to do?</p>
-            
-            <div className="space-y-3">
-              <Button variant="outline" className="w-full justify-start" onClick={handleScheduleMeeting}>
-                <Calendar size={16} className="mr-2" />
-                Schedule Daily Standup
-              </Button>
-              
-              <Button variant="outline" className="w-full justify-start" onClick={handleCreateTicket}>
-                <RefreshCcw size={16} className="mr-2" />
-                Create Sprint Planning Ticket
-              </Button>
-              
-              <Button variant="outline" className="w-full justify-start" onClick={() => {
-                toast({
-                  title: "Reminder Set",
-                  description: "Team members will be reminded of due tasks",
-                });
-                setIsOpen(false);
-              }}>
-                <Calendar size={16} className="mr-2" />
-                Send Task Reminders
-              </Button>
-            </div>
-            
-            <Separator />
-            
-            <div>
-              <Label className="text-sm">Custom command</Label>
-              <div className="flex gap-2 mt-2">
-                <Textarea 
-                  placeholder="Enter a custom command..." 
-                  className="min-h-[60px] resize-none text-sm"
-                />
-                <Button className="self-end" size="sm">
-                  <ArrowRight size={16} />
-                </Button>
-              </div>
-            </div>
-          </div>
-        )}
-        
-        {activeTab === 'pm' && (
-          <div className="p-3 space-y-4">
-            <div>
-              <h4 className="font-medium mb-2 flex items-center">
-                <Brain size={16} className="mr-2" />
-                Project Management Strategy
-              </h4>
-              <RadioGroup value={selectedStrategy} onValueChange={setSelectedStrategy}>
-                {projectStrategies.map((strategy) => (
-                  <div key={strategy.name} className="flex items-start space-x-2 py-2">
-                    <RadioGroupItem value={strategy.name} id={strategy.name} />
-                    <div className="grid gap-1.5">
-                      <Label htmlFor={strategy.name} className="font-medium">
-                        {strategy.name}
-                      </Label>
-                      <p className="text-sm text-muted-foreground">
-                        {strategy.description}
-                      </p>
-                    </div>
+              ))
+            )}
+            {isTyping && (
+              <div className="flex justify-start">
+                <div className="bg-muted rounded-lg px-4 py-2">
+                  <div className="flex space-x-1">
+                    <div className="w-2 h-2 rounded-full bg-current animate-bounce" />
+                    <div className="w-2 h-2 rounded-full bg-current animate-bounce [animation-delay:-.3s]" />
+                    <div className="w-2 h-2 rounded-full bg-current animate-bounce [animation-delay:-.5s]" />
                   </div>
-                ))}
-              </RadioGroup>
-              
-              <Button className="w-full mt-2" onClick={() => {
-                toast({
-                  title: "Strategy Applied",
-                  description: `Project is now using ${selectedStrategy} methodology`,
-                });
-                setIsOpen(false);
-              }}>
-                Apply Strategy
-              </Button>
-            </div>
-            
-            <Separator />
-            
-            <div>
-              <h4 className="font-medium mb-2">Automated Schedules</h4>
-              <div className="space-y-2">
-                <div className="flex items-center justify-between bg-muted p-2 rounded-md">
-                  <span className="text-sm">Daily Standup</span>
-                  <Badge>10:00 AM</Badge>
-                </div>
-                <div className="flex items-center justify-between bg-muted p-2 rounded-md">
-                  <span className="text-sm">Sprint Planning</span>
-                  <Badge>Monday 2:00 PM</Badge>
-                </div>
-                <div className="flex items-center justify-between bg-muted p-2 rounded-md">
-                  <span className="text-sm">Retrospective</span>
-                  <Badge>Friday 4:00 PM</Badge>
                 </div>
               </div>
-            </div>
+            )}
           </div>
-        )}
-      </PopoverContent>
-    </Popover>
+          
+          <form onSubmit={handleSubmit} className="border-t pt-4 mt-auto">
+            <div className="relative">
+              <Textarea
+                value={prompt}
+                onChange={(e) => setPrompt(e.target.value)}
+                placeholder={assistantModes[mode].placeholder}
+                className="min-h-12 resize-none pr-20"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSubmit(e);
+                  }
+                }}
+              />
+              <Button 
+                type="submit" 
+                size="sm" 
+                className="absolute right-2 bottom-2"
+                disabled={!prompt.trim() || isTyping}
+              >
+                <MessageSquare size={16} className="mr-1" />
+                Send
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 };
 
