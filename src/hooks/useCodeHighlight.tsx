@@ -26,6 +26,7 @@ export const useCodeHighlight = (code: string, issues: CodeIssue[]) => {
           className={className}
           data-line-number={lineNumber}
           data-issue-id={issue?.id}
+          data-ticket-linked={issue?.ticketId ? 'true' : 'false'}
         >
           {line || ' '}
         </div>
